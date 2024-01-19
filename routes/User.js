@@ -19,9 +19,9 @@ router.get('/', (req, res, next) => {
     });
 });
 
-router.get('/:userId', (req, res, next) => {
-  const id = req.params.userId;
-  User.findById(id)
+router.get('/:uid', (req, res, next) => {
+  const uid = req.params.uid.toString();
+  User.find({ uid: uid })
     .exec()
     .then((docs) => {
       console.log(docs);
@@ -38,9 +38,9 @@ router.get('/:userId', (req, res, next) => {
 router.post('/', (req, res, next) => {
   const user = new User({
     _id: new mongoose.Types.ObjectId(),
+    uid: req.body.uid,
     name: req.body.name,
     pin: req.body.pin,
-    accountId: req.body.account,
   });
   user
     .save()
@@ -68,6 +68,25 @@ router.delete('/:userId', (req, res, next) => {
     })
     .catch((err) => {
       console.log(err);
+      res.status(500).json({
+        error: err,
+      });
+    });
+});
+
+router.post('/login', (req, res, next) => {
+  const uid = req.body.uid;
+  const name = req.body.name;
+  const pin = req.body.pin;
+
+  User.findOne({ uid: uid, name: name, pin: pin })
+    .populate('favoriteMovies')
+    .exec()
+    .then((result) => {
+      res.status(200).json(result);
+    })
+    .catch((err) => {
+      console.log('accounts', err);
       res.status(500).json({
         error: err,
       });

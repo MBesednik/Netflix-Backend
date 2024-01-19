@@ -1,23 +1,30 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
+const cors = require('cors');
 
 const userRoutes = require('./routes/User');
-const accountRoutes = require('./routes/Account');
+const movieRoutes = require('./routes/Movie');
 
 async function startServer() {
   const app = express();
 
-  app.use(bodyParser.json());
+  app.use(express.json());
+  app.use(cors());
 
   app.use('/user', userRoutes);
-  app.use('/account', accountRoutes);
+  app.use('/movie', movieRoutes);
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET,OPTIONS');
+    res.setHeader(
+      'Access-Control-Allow-Methods',
+      'POST, GET,OPTIONS',
+      'Access - Control - Allow - Origin'
+    );
     res.setHeader(
       'Access-Control-Allow-Headers',
-      'Content-Type, Authorization'
+      'Content-Type, Authorization',
+      'Access - Control - Allow - Origin'
     );
     if (req.method === 'OPTIONS') {
       return res.sendStatus(200);

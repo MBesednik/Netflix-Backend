@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const userSchema = mongoose.Schema({
   _id: mongoose.Schema.Types.ObjectId,
+  uid: String,
   name: {
     type: String,
     required: true,
@@ -18,11 +19,6 @@ const userSchema = mongoose.Schema({
       default: [],
     },
   ],
-  accountId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Account',
-    required: true,
-  },
 });
 
 module.exports = mongoose.model('User', userSchema);

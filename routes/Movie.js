@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const User = require('../models/user');
 const Movie = require('../models/movie');
 
+// Dohvati sve filmove
 router.get('/', (req, res, next) => {
   Movie.find()
     .exec()
@@ -20,6 +21,7 @@ router.get('/', (req, res, next) => {
     });
 });
 
+// Dohvati detalje filma po id-u
 router.get('/movieDetails/:movieId', (req, res, next) => {
   const id = req.params.movieId;
   Movie.findById(id)
@@ -36,39 +38,57 @@ router.get('/movieDetails/:movieId', (req, res, next) => {
     });
 });
 
+router.get('/favoriteMovies/:userId', (req, res, next) => {
+  const userId = req.params.userId;
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(400).json({ message: 'Invalid user ID' });
+  }
+
+  User.findById(userId)
+    .populate('favoriteMovies')
+    .exec()
+    .then((user) => {
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      res.status(200).json(user.favoriteMovies);
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(500).json({ error: 'Internal server error' });
+    });
+});
+
 //localhost:8000/[movieId]/[userId]/addToFavorites
+// Postavljanje filmova kao favorit ili odmicanje (ako se vec nalazi u listi onda se brise iz nje suprotno dodaje kao favorit)
 router.post('/addToFavorites', async (req, res, next) => {
   console.log('Request received', req.body);
-  const { movieId, userId } = req.body; // Extract from req.body
+  const { movieId, userId } = req.body;
   try {
-    // Convert movieId to ObjectId
     const movieObjectId = new mongoose.Types.ObjectId(movieId);
 
     // Find the user
-    const user = await User.findOne({ uid: userId }); // Add await
+    const user = await User.findOne({ uid: userId });
     if (!user) {
       return res.status(400).json({ message: 'User not found' });
     }
 
-    const movie = await Movie.findById(movieObjectId); // Add await
+    const movie = await Movie.findById(movieObjectId);
     if (!movie) {
       return res.status(400).json({ message: 'Movie not found' });
     }
 
-    // Check if the movie is already in the user's favorites
     if (user.favoriteMovies.includes(movieObjectId)) {
-      // Remove from favorites and decrease views
       user.favoriteMovies.pull(movieObjectId);
       movie.views = Math.max(0, movie.views - 1);
     } else {
-      // Add to favorites and increase views
       user.favoriteMovies.push(movieObjectId);
       movie.views += 1;
     }
 
-    // Save the updated user and movie
-    await user.save(); // Add await
-    await movie.save(); // Add await
+    await user.save();
+    await movie.save();
 
     res.status(200).json({ message: 'Favorites updated', movie });
   } catch (err) {
@@ -77,9 +97,8 @@ router.post('/addToFavorites', async (req, res, next) => {
   }
 });
 
-// preporuke
-
-//Top 10 globalni prema popularnosti i pregledima usera
+// PREPORUKE
+// helper func za dohvacanje Top 10 prema popularnosti i pregledima usera
 const getLatestPopularMovies = async () => {
   try {
     const topTenMovies = await Movie.find()
@@ -88,10 +107,11 @@ const getLatestPopularMovies = async () => {
     return topTenMovies;
   } catch (error) {
     console.error('Error fetching top ten popular movies:', error);
-    throw error; // or return an empty array, or handle the error as per your application's requirements
+    throw error;
   }
 };
 
+// Top 10 nedavnih filmova
 router.get('/popularMovies', async (req, res) => {
   try {
     const topTenMovies = await getLatestPopularMovies();
@@ -103,17 +123,18 @@ router.get('/popularMovies', async (req, res) => {
   }
 });
 
-// Top 10 globalno all time
+// helper func za dohvacanje Top 10 globalno all time
 const getPopularMoviesAllTime = async () => {
   try {
     const topTenMovies = await Movie.find().sort({ popularity: -1 }).limit(10);
     return topTenMovies;
   } catch (error) {
     console.error('Error fetching top ten popular movies:', error);
-    throw error; // or return an empty array, or handle the error as per your application's requirements
+    throw error;
   }
 };
 
+// Top 10 najpopularnijih svih vremena
 router.get('/popularMoviesAllTime', async (req, res) => {
   try {
     const movies = await getPopularMoviesAllTime();
@@ -123,7 +144,7 @@ router.get('/popularMoviesAllTime', async (req, res) => {
   }
 });
 
-// Top 10 po ocjenama all time
+//helper func za dohvacanje top 10 po ocjenama all time
 const getMostRatingAllTime = async () => {
   try {
     const topTenMovies = await Movie.find().sort({ rating: -1 }).limit(10);
@@ -134,6 +155,7 @@ const getMostRatingAllTime = async () => {
   }
 };
 
+// filmovi po ocjenama
 router.get('/mostRated', async (req, res, next) => {
   try {
     console.log('LOLOLO:');
@@ -148,27 +170,25 @@ router.get('/mostRated', async (req, res, next) => {
   }
 });
 
-// Top 10 po user favoritima
+// Preporuka za korisnika speficno
 const recommendMoviesBasedOnFavorites = async (userId) => {
   try {
-    // Find the user and populate favoriteMovies
     const user = await User.findOne({ uid: userId }).populate('favoriteMovies');
     if (!user) {
       throw new Error('User not found');
     }
 
-    // Check if the user has favorite movies
     if (user.favoriteMovies.length === 0) {
       throw new Error('No favorite movies found for user');
     }
 
-    // Count genres in favorite movies
+    // dohvati zanrove i njihov count
     const genreCounts = user.favoriteMovies.reduce((acc, movie) => {
       acc[movie.genre] = (acc[movie.genre] || 0) + 1;
       return acc;
     }, {});
 
-    // Calculate the distribution
+    // postotak zanra u ukupnoj listi favorita
     const totalFavorites = user.favoriteMovies.length;
     const genreDistribution = Object.entries(genreCounts).map(
       ([genre, count]) => {
@@ -176,7 +196,7 @@ const recommendMoviesBasedOnFavorites = async (userId) => {
       }
     );
 
-    // Fetch movies based on distribution
+    // kreiraj omjer filmova po zanru (100% = 33% komedija, 33% akcija, 34% drama)
     let recommendedMovies = [];
     for (const { genre, percentage } of genreDistribution) {
       const numberToFetch = Math.round(10 * percentage);
@@ -187,7 +207,7 @@ const recommendMoviesBasedOnFavorites = async (userId) => {
       recommendedMovies = recommendedMovies.concat(movies);
     }
 
-    // Fill the rest with random movies if necessary
+    // dodaj random filmove ako ih u listi nema 10
     if (recommendedMovies.length < 10) {
       const additionalMovies = await Movie.find({
         _id: { $nin: user.favoriteMovies.map((movie) => movie._id) },
@@ -202,7 +222,7 @@ const recommendMoviesBasedOnFavorites = async (userId) => {
   }
 };
 
-// Example usage in an Express route
+// user recommendation
 router.get('/recommendForUser/:userId', async (req, res) => {
   try {
     console.log(req.params.userId);
@@ -215,7 +235,7 @@ router.get('/recommendForUser/:userId', async (req, res) => {
   }
 });
 
-//Top 10 po ostalim userima
+// Top 10 po ostalim userima
 const getTopTenMoviesByViews = async () => {
   try {
     // Pronalazak 10 filmova s najvećim brojem pregleda
@@ -230,7 +250,7 @@ const getTopTenMoviesByViews = async () => {
   }
 };
 
-// Primjer korištenja u Express ruti
+// recomendadtion by other po broju pregleda
 router.get('/moviesByOther', async (req, res) => {
   try {
     const movies = await getTopTenMoviesByViews();
@@ -242,7 +262,7 @@ router.get('/moviesByOther', async (req, res) => {
   }
 });
 
-//filmovi po Zanru
+// helper function for getting by genre
 const getMoviesByGenre = async (genre) => {
   try {
     // Pronalazak filmova koji odgovaraju zadanom žanru
@@ -254,7 +274,7 @@ const getMoviesByGenre = async (genre) => {
   }
 };
 
-// Primjer korištenja u Express ruti
+// get movies by genre
 router.get('/genre/:genre', async (req, res) => {
   try {
     const genre = req.params.genre;
@@ -265,6 +285,7 @@ router.get('/genre/:genre', async (req, res) => {
   }
 });
 
+// add new movie
 router.post('/', (req, res, next) => {
   console.log(req.body);
   const movie = new Movie({
@@ -295,6 +316,7 @@ router.post('/', (req, res, next) => {
     });
 });
 
+// Delete movie from db by id
 router.delete('/:movieId', (req, res, next) => {
   const id = req.params.movieId;
   Movie.findByIdAndDelete(id)
